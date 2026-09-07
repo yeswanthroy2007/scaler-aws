@@ -130,6 +130,7 @@ Repositories
 SQLAlchemy ORM
     ↓
 SQLite
+```
 
 ## 📁 Folder Structure
 
@@ -165,6 +166,7 @@ SQLite
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
+```
 
 ## Database schema
 
@@ -230,49 +232,8 @@ erDiagram
 
 **Cascading:** `dns_records.hosted_zone_id` has `ON DELETE CASCADE` (with SQLite `PRAGMA foreign_keys=ON` enabled per-connection so it's actually enforced) -- deleting a hosted zone deletes all of its records. `audit_logs.user_id` uses `ON DELETE SET NULL` so history survives user deletion.
 
-## 🔌 API Reference
-
-All endpoints are prefixed with `/api`.
-
-Authentication is required for all endpoints except `/api/auth/login` and `/api/health`. Sessions can be provided through an `httpOnly` cookie or `Authorization: Bearer <token>`.
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/login` | Authenticate and create a session |
-| POST | `/api/auth/logout` | End the current session |
-| GET | `/api/auth/me` | Get current user |
-| GET | `/api/dashboard/summary` | Dashboard statistics and recent activity |
-| GET | `/api/search?q=` | Global search |
-| GET | `/api/hosted-zones` | List hosted zones with search/filter/sort/pagination |
-| POST | `/api/hosted-zones` | Create hosted zone |
-| GET | `/api/hosted-zones/{id}` | Get hosted zone |
-| PUT | `/api/hosted-zones/{id}` | Update hosted zone |
-| DELETE | `/api/hosted-zones/{id}` | Delete hosted zone |
-| GET | `/api/hosted-zones/{id}/records` | List DNS records |
-| POST | `/api/hosted-zones/{id}/records` | Create DNS record |
-| GET/PUT/DELETE | `/api/hosted-zones/{id}/records/{record_id}` | Manage DNS record |
-| POST | `/api/hosted-zones/{id}/records/bulk-delete` | Bulk delete records |
-| POST | `/api/hosted-zones/{id}/import/preview` | Preview BIND import |
-| POST | `/api/hosted-zones/{id}/import/confirm` | Confirm BIND import |
-| GET | `/api/hosted-zones/{id}/export?format=json\|bind` | Export zone |
-
-### Response Format
-
-List endpoints return:
-
-```json
-{
-  "items": [],
-  "meta": {
-    "total": 0,
-    "page": 1,
-    "page_size": 20,
-    "total_pages": 0
-  }
-}
 
 ## Authentication / demo credentials
-
 ```
 Email:    admin@example.com
 Password: Password123!
