@@ -1,7 +1,19 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+/**
+ * The rewrite below appends "/api/:path*" itself, so BACKEND_URL must be the
+ * bare origin (e.g. "https://scaler-aws-u8tk.onrender.com"), not something
+ * already ending in "/api" -- otherwise every request gets proxied to a
+ * doubled "/api/api/..." path, which doesn't match any FastAPI route and
+ * comes back 404. Strip a trailing "/api" (and any trailing slash) so a
+ * misconfigured env var can't silently break every API call in production.
+ */
+function normalizeBackendUrl(raw: string): string {
+  return raw.trim().replace(/\/+$/, "").replace(/\/api$/i, "");
+}
+
+const BACKEND_URL = normalizeBackendUrl(process.env.BACKEND_URL || "http://127.0.0.1:8000");
 
 const nextConfig: NextConfig = {
   // `standalone` output is only for the self-hosted Docker build (see
