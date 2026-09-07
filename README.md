@@ -74,6 +74,7 @@ flowchart LR
         Hooks --> Services["API client (services/api/*)"]
         Views["Reusable views (components/*)"] --> Pages
     end
+
     Services -- "fetch (same-origin, via Next.js rewrite)" --> Routes
 
     subgraph Backend
