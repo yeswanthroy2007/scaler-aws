@@ -6,12 +6,15 @@ A production-quality full-stack clone of the **AWS Route 53 Console**, built wit
 
 ---
 
+## Demo Video
+
+https://github.com/user-attachments/assets/fa96def5-f931-4a03-a5d7-726bbd15ad3a
+
 ## Live Demo
 
 - **Frontend:** https://scaler-aws.vercel.app/
 - **Backend API:** https://scaler-aws-u8tk.onrender.com/
 - **API Documentation:** https://scaler-aws-u8tk.onrender.com/docs
-
 ---
 
 ## Features
