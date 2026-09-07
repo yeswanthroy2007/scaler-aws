@@ -1,88 +1,67 @@
 # Route 53 Console Clone
 
-A production-quality, full-stack clone of the AWS Route 53 web console -- built as a technical assignment to demonstrate frontend engineering, backend architecture, database design, and product/UX polish.
+A production-quality full-stack clone of the **AWS Route 53 Console**, built with Next.js, FastAPI, SQLAlchemy, and SQLite.
 
-> **Not affiliated with Amazon Web Services.** This is an educational clone with mocked authentication and no real DNS is served.
-
-![Tech](https://img.shields.io/badge/frontend-Next.js%20%2B%20TypeScript-black) ![Tech](https://img.shields.io/badge/backend-FastAPI%20%2B%20SQLAlchemy-009688) ![Tech](https://img.shields.io/badge/db-SQLite-003B57)
+> **Disclaimer:** This project is an educational clone and is not affiliated with or endorsed by Amazon Web Services. DNS operations are simulated and do not modify real DNS infrastructure.
 
 ---
 
-## Table of contents
+## Live Demo
 
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Tech stack](#tech-stack)
-4. [Architecture](#architecture)
-5. [Folder structure](#folder-structure)
-6. [Database schema](#database-schema)
-7. [API reference](#api-reference)
-8. [Authentication / demo credentials](#authentication--demo-credentials)
-9. [Local setup](#local-setup)
-10. [Environment variables](#environment-variables)
-11. [Running the backend](#running-the-backend)
-12. [Running the frontend](#running-the-frontend)
-13. [Running tests](#running-tests)
-14. [Docker](#docker)
-15. [BIND import](#bind-import)
-16. [Export](#export)
-17. [Global search](#global-search)
-18. [Keyboard shortcuts](#keyboard-shortcuts)
-19. [Design decisions](#design-decisions)
-20. [Known limitations / future improvements](#known-limitations--future-improvements)
+- **Frontend:** https://scaler-aws.vercel.app/
+- **Backend API:** https://scaler-aws-u8tk.onrender.com/
+- **API Documentation:** https://scaler-aws-u8tk.onrender.com/docs
 
 ---
-
-## Overview
-
-The app recreates the core Route 53 console experience:
-
-- AWS-style global header with a **live, backend-driven search bar** (region selector, notifications, help, account menu) and a collapsible service sidebar that becomes an off-canvas drawer on mobile
-- A Route 53 **Overview** dashboard with live stats and a real recent-activity feed
-- Full **Hosted Zones** CRUD with search, filtering, sorting, and pagination -- backed by real API queries, not client-side faking
-- Full **DNS Records** CRUD for all 9 common record types (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA), with a record-type-aware dynamic form
-- **Global search** across hosted zones, DNS records, and Route 53 sections, with an AWS-style results dropdown and click-to-navigate
-- **BIND zone file import** (upload -> parse -> preview -> confirm, with a per-record error report)
-- **Export** to JSON or a BIND zone file
-- **Dark mode**, **keyboard shortcuts**, and **bulk record selection/delete**
-- Polished "Coming soon" pages for Traffic Policies, Health Checks, Resolver, and Profiles
-- Mocked authentication with persistent sessions and protected routes
-- Responsive down to mobile: tables scroll horizontally in place, and the sidebar collapses to icons on desktop or a full off-canvas drawer below `md`
 
 ## Features
 
-| Area | Status |
-|---|---|
-| Login / logout / persistent session | Done |
-| Protected routes (server + client) | Done |
-| Route 53 dashboard (stats, getting started, recent activity) | Done |
-| Hosted zones: list / create / view / edit / delete | Done |
-| Hosted zones: search, filter by type, sort, pagination | Done |
-| Private hosted zones with mock VPC metadata | Done |
-| DNS records: list / create / view / edit / delete | Done |
-| DNS records: search, filter by type, sort, pagination | Done |
-| Dynamic per-record-type form + client + server validation | Done |
-| Global search (hosted zones, DNS records, sections) | Done |
-| Confirmation dialogs for destructive actions | Done |
-| Toast notifications, loading/empty/error states | Done |
-| BIND zone file import (preview + confirm + summary) | Done |
-| Export to JSON / BIND | Done |
-| Dark mode (persisted) | Done |
-| Keyboard shortcuts (`/`, `n`, `Esc`, `g h`, `g o`) | Done |
-| Bulk record selection + bulk delete | Done |
-| Coming Soon pages (Traffic Policies, Health Checks, Resolver, Profiles) | Done |
-| Audit log of create/update/delete/import actions | Done |
-| Responsive layout (desktop icon-rail sidebar, mobile off-canvas drawer) | Done |
-| Automated tests (backend + frontend) | Done (52 backend, 33 frontend) |
-| Docker Compose | Provided (see [limitations](#known-limitations--future-improvements)) |
+### Route 53 Console
+- AWS-inspired dashboard and navigation
+- Hosted Zones management
+- DNS Records management
+- Global search
+- Recent activity tracking
+- Search, filtering, sorting, and pagination
 
-## Tech stack
+### DNS Management
+- Support for:
+  - A
+  - AAAA
+  - CNAME
+  - TXT
+  - MX
+  - NS
+  - PTR
+  - SRV
+  - CAA
+- Create, view, edit, and delete records
+- Bulk record deletion
+- BIND import
+- JSON and BIND export
 
-**Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, `lucide-react` icons.
+### User Experience
+- Responsive AWS-style interface
+- Dark mode
+- Toast notifications
+- Modal dialogs
+- Keyboard shortcuts
+- URL-synchronized search and filters
+- Empty, loading, and error states
 
-**Backend:** FastAPI, Pydantic v2, SQLAlchemy 2.0 (ORM), SQLite, pytest.
+### Authentication
+- Mock login/logout flow
+- Session persistence
+- HTTP-only session cookies
+- Protected application routes
 
-**Auth:** Mocked -- PBKDF2-HMAC password hashing (stdlib `hashlib`, no native deps) + opaque HMAC-signed session tokens delivered as an `httpOnly` cookie. No real IAM/OAuth.
+## Tech Stack
+
+**Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, `lucide-react`
+
+**Backend:** FastAPI, Pydantic v2, SQLAlchemy 2.0 (ORM), SQLite, pytest
+
+**Authentication:** Mock authentication using PBKDF2-HMAC password hashing and HMAC-signed session tokens stored in `httpOnly` cookies. No real IAM/OAuth.
 
 ## Architecture
 
@@ -106,62 +85,86 @@ flowchart LR
     end
 ```
 
-**Backend layering (strict):**
+### Backend
 
-- **`api/routes/*`** -- FastAPI `APIRouter`s. Parse the request (path/query/body), call exactly one controller function, shape the HTTP response (status code, cookies, headers). No business logic.
-- **`controllers/*`** -- Orchestrate one HTTP operation: call a service, commit the transaction on success, return a schema. This is the only layer allowed to call `db.commit()`.
-- **`services/*`** -- All business logic and validation rules that go beyond what Pydantic can express (uniqueness checks, cross-field rules, name-server generation, BIND parsing orchestration, audit logging). Services raise typed domain exceptions (`app/core/exceptions.py`) instead of HTTP errors.
-- **`repositories/*`** -- The only layer that touches the SQLAlchemy `Session` for queries. Encapsulates filtering/sorting/pagination SQL.
-- **`models/*`** -- SQLAlchemy ORM entities and relationships.
-- **`schemas/*`** -- Pydantic request/response contracts, decoupled from ORM models.
+The backend follows a strict layered architecture:
 
-A single `app.exception_handler(AppError)` in `main.py` maps domain exceptions to HTTP status codes (404/409/422/401/413), so controllers never write `try/except` boilerplate for expected failure cases.
+- **Routes** — Parse HTTP requests and delegate to controllers.
+- **Controllers** — Orchestrate requests and manage successful transactions.
+- **Services** — Contain business logic, validation, BIND processing, and audit logging.
+- **Repositories** — Handle all SQLAlchemy queries, filtering, sorting, and pagination.
+- **Models** — Define SQLAlchemy ORM entities and relationships.
+- **Schemas** — Define Pydantic request/response contracts.
 
-**Frontend layering (MVC-inspired):**
+Expected domain errors are handled centrally through `AppError`, keeping HTTP concerns out of the business layer.
 
-- **`app/*`** -- Route segments (pages/layouts only). Server components await `params`/`searchParams` and hand off to a client component; pages stay thin.
-- **`features/<domain>/*`** -- The "controller" layer: hooks (`useHostedZonesList`, `useDnsRecordsList`) that own URL-synced filter/sort/page state and call the API layer, plus feature-specific modals/dialogs/tables that compose shared views.
-- **`services/api/*`** -- A typed fetch client per resource (`hostedZones.ts`, `dnsRecords.ts`, ...) built on a shared `apiClient` that normalizes errors into a typed `ApiError`.
-- **`types/*`** -- Shared TypeScript models mirroring the backend's Pydantic schemas.
-- **`components/*`** -- Presentational, reusable views (`ui/`, `layout/`, `tables/`, `modals/`, `feedback/`) with no direct API calls.
+### Frontend
 
-No component fetches data or calls `fetch()` directly outside of `services/api/*`; no route function in the backend touches SQLAlchemy directly.
+The frontend uses an MVC-inspired feature architecture:
 
-See [`docs/architecture.md`](docs/architecture.md) for request-lifecycle diagrams (auth flow, hosted zone CRUD, DNS record CRUD, import, export).
+- **`app/*`** — Thin Next.js route pages and layouts.
+- **`features/*`** — Feature logic, hooks, tables, and dialogs.
+- **`services/api/*`** — Typed API clients and centralized error handling.
+- **`types/*`** — Shared TypeScript models.
+- **`components/*`** — Reusable presentational UI components.
 
-## Folder structure
+Components never call the API directly; all API communication goes through the typed API layer.
 
-```
+### Request Flow
+
+```text
+Next.js UI
+    ↓
+Feature Hooks
+    ↓
+Typed API Client
+    ↓
+FastAPI Routes
+    ↓
+Controllers
+    ↓
+Services
+    ↓
+Repositories
+    ↓
+SQLAlchemy ORM
+    ↓
+SQLite
+
+## 📁 Folder Structure
+
+```text
 .
 ├── backend/
-│   └── app/
-│       ├── main.py            # FastAPI app, CORS, exception handlers, router registration
-│       ├── core/               # config, database engine/session, security (hashing/session tokens), exceptions
-│       ├── models/             # SQLAlchemy models: User, HostedZone, DnsRecord, AuditLog
-│       ├── schemas/             # Pydantic request/response contracts + validation
-│       ├── repositories/       # Query layer (filtering, sorting, pagination)
-│       ├── services/            # Business logic, BIND parsing/export, audit logging
-│       ├── controllers/        # HTTP orchestration called by routes
-│       ├── api/routes/          # FastAPI routers (thin), incl. search.py
-│       ├── utils/                # BIND parser, name-server generator
-│       └── seed.py               # Seed script (demo user + 5 zones + records + activity)
-│   └── tests/                    # pytest suite (52 tests)
+│   ├── app/
+│   │   ├── main.py              # FastAPI app, CORS, handlers, routes
+│   │   ├── core/                # Config, database, security, exceptions
+│   │   ├── models/              # SQLAlchemy ORM models
+│   │   ├── schemas/             # Pydantic request/response schemas
+│   │   ├── repositories/        # Database queries and pagination
+│   │   ├── services/            # Business logic and DNS operations
+│   │   ├── controllers/         # HTTP operation orchestration
+│   │   ├── api/routes/          # FastAPI route definitions
+│   │   ├── utils/               # BIND parser and DNS utilities
+│   │   └── seed.py              # Demo data seeding
+│   └── tests/                   # Backend tests
+│
 ├── frontend/
 │   └── src/
-│       ├── app/                 # Next.js App Router pages/layouts
-│       ├── features/            # Domain hooks + feature-specific components (auth, hosted-zones, dns-records, search, theme, shortcuts)
-│       ├── components/          # Reusable UI (ui/, layout/, tables/, modals/, feedback/, route53/)
-│       ├── services/api/        # Typed API client
-│       ├── types/                # Shared TS types
-│       ├── hooks/                 # Generic hooks (useAsyncData, useDebounce, useUrlParams, useKeyboardShortcut)
-│       ├── constants/             # Nav config, DNS record field config
-│       └── utils/                 # Formatters, class-name helper
+│       ├── app/                 # Next.js routes and layouts
+│       ├── features/            # Domain-specific logic and components
+│       ├── components/          # Reusable UI components
+│       ├── services/api/        # Typed API clients
+│       ├── types/               # Shared TypeScript types
+│       ├── hooks/               # Reusable React hooks
+│       ├── constants/           # Navigation and DNS configuration
+│       └── utils/               # Formatting and utility functions
+│
 ├── docs/
-│   └── architecture.md
+│   └── architecture.md          # Detailed architecture documentation
 ├── docker-compose.yml
 ├── .env.example
 └── README.md
-```
 
 ## Database schema
 
@@ -227,33 +230,46 @@ erDiagram
 
 **Cascading:** `dns_records.hosted_zone_id` has `ON DELETE CASCADE` (with SQLite `PRAGMA foreign_keys=ON` enabled per-connection so it's actually enforced) -- deleting a hosted zone deletes all of its records. `audit_logs.user_id` uses `ON DELETE SET NULL` so history survives user deletion.
 
-## API reference
+## 🔌 API Reference
 
-All routes are prefixed `/api`. Except `/api/auth/login` and `/api/health`, every route requires a valid session (cookie or `Authorization: Bearer <token>`).
+All endpoints are prefixed with `/api`.
 
-| Method | Path | Description |
+Authentication is required for all endpoints except `/api/auth/login` and `/api/health`. Sessions can be provided through an `httpOnly` cookie or `Authorization: Bearer <token>`.
+
+| Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/auth/login` | Authenticate, set session cookie |
-| POST | `/api/auth/logout` | Clear session cookie |
-| GET | `/api/auth/me` | Current user |
-| GET | `/api/dashboard/summary` | Zone/record counts + recent activity |
-| GET | `/api/search?q=` | Global search across hosted zones, DNS records, and Route 53 sections |
-| GET | `/api/hosted-zones` | List zones -- `search, zone_type, sort_by, sort_dir, page, page_size` |
-| POST | `/api/hosted-zones` | Create a hosted zone |
-| GET | `/api/hosted-zones/{id}` | Get one zone |
-| PUT | `/api/hosted-zones/{id}` | Update description/comment |
-| DELETE | `/api/hosted-zones/{id}` | Delete a zone (cascades to records) |
-| GET | `/api/hosted-zones/{id}/records` | List records -- `search, type, sort_by, sort_dir, page, page_size` |
-| POST | `/api/hosted-zones/{id}/records` | Create a record |
-| GET/PUT/DELETE | `/api/hosted-zones/{id}/records/{record_id}` | Get / update / delete a record |
-| POST | `/api/hosted-zones/{id}/records/bulk-delete` | Delete many records by id |
-| POST | `/api/hosted-zones/{id}/import/preview` | Upload a BIND file, get a parsed preview |
-| POST | `/api/hosted-zones/{id}/import/confirm` | Commit a previewed import |
-| GET | `/api/hosted-zones/{id}/export?format=json\|bind` | Download a zone export |
+| POST | `/api/auth/login` | Authenticate and create a session |
+| POST | `/api/auth/logout` | End the current session |
+| GET | `/api/auth/me` | Get current user |
+| GET | `/api/dashboard/summary` | Dashboard statistics and recent activity |
+| GET | `/api/search?q=` | Global search |
+| GET | `/api/hosted-zones` | List hosted zones with search/filter/sort/pagination |
+| POST | `/api/hosted-zones` | Create hosted zone |
+| GET | `/api/hosted-zones/{id}` | Get hosted zone |
+| PUT | `/api/hosted-zones/{id}` | Update hosted zone |
+| DELETE | `/api/hosted-zones/{id}` | Delete hosted zone |
+| GET | `/api/hosted-zones/{id}/records` | List DNS records |
+| POST | `/api/hosted-zones/{id}/records` | Create DNS record |
+| GET/PUT/DELETE | `/api/hosted-zones/{id}/records/{record_id}` | Manage DNS record |
+| POST | `/api/hosted-zones/{id}/records/bulk-delete` | Bulk delete records |
+| POST | `/api/hosted-zones/{id}/import/preview` | Preview BIND import |
+| POST | `/api/hosted-zones/{id}/import/confirm` | Confirm BIND import |
+| GET | `/api/hosted-zones/{id}/export?format=json\|bind` | Export zone |
 
-List endpoints return `{ items, meta: { total, page, page_size, total_pages } }`.
+### Response Format
 
-Interactive Swagger docs are available at `http://localhost:8000/docs` once the backend is running.
+List endpoints return:
+
+```json
+{
+  "items": [],
+  "meta": {
+    "total": 0,
+    "page": 1,
+    "page_size": 20,
+    "total_pages": 0
+  }
+}
 
 ## Authentication / demo credentials
 
@@ -273,24 +289,13 @@ git clone https://github.com/yeswanthroy2007/scaler-aws-router53-clone.git
 cd scaler-aws-router53-clone
 ```
 
-## Environment variables
+## Environment Variables
 
 Copy the example files:
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
-```
-
-| Variable | Where | Default | Purpose |
-|---|---|---|---|
-| `DATABASE_URL` | backend | `sqlite:///./route53.db` | SQLAlchemy connection string |
-| `SESSION_SECRET_KEY` | backend | dev placeholder | HMAC key signing session tokens -- **change outside local dev** |
-| `SESSION_TTL_SECONDS` | backend | `43200` (12h) | Session lifetime |
-| `CORS_ORIGINS` | backend | `http://localhost:3000,http://127.0.0.1:3000` | Allowed CORS origins |
-| `BACKEND_URL` | frontend | `http://127.0.0.1:8000` | Where Next.js proxies `/api/*` to (see `next.config.ts`) |
-
-The frontend never calls the backend cross-origin from the browser: `next.config.ts` rewrites `/api/*` to `BACKEND_URL` server-side, so the browser only ever talks to `localhost:3000`, and the backend's `httpOnly` session cookie works without extra cross-site cookie configuration.
 
 ## Running the backend
 
@@ -308,8 +313,6 @@ The API is now at `http://localhost:8000` (docs at `/docs`).
 
 Re-run `python -m app.seed --reset` at any time to wipe and reseed the database.
 
-> **Windows note:** if `--reload` doesn't seem to pick up a code change (rare, but seen on Windows with `WatchFiles`), stop the process and re-run `uvicorn app.main:app --port 8000` without `--reload` -- a clean restart always picks up the latest code.
-
 ## Running the frontend
 
 ```bash
@@ -322,14 +325,14 @@ Open `http://localhost:3000` -- you'll be redirected to `/login`.
 
 ## Running tests
 
-**Backend** (52 tests -- auth, hosted zone CRUD, record CRUD + validation, search/filter/pagination, import, export, dashboard, global search):
+**Backend**
 
 ```bash
 cd backend
 python -m pytest -q
 ```
 
-**Frontend** (33 tests -- record-type validation rules, formatters, `Button` component, `useDebounce` hook, login form validation + API error handling):
+**Frontend** 
 
 ```bash
 cd frontend
@@ -345,48 +348,26 @@ npm run lint       # ESLint
 npm run build      # production build
 ```
 
-## Docker
+## BIND Import & Export
 
-A `docker-compose.yml` at the repo root builds both services:
+### Import
+- Upload a BIND zone file.
+- Preview parsed records before saving.
+- Validate and report created, skipped, and failed records.
 
-```bash
-docker compose up --build
-```
+### Export
+- Export hosted zones as **JSON** or **BIND zone files**.
+- Files are generated server-side from the current database records.
 
-- `backend` seeds its SQLite database (stored in a named volume) on first boot and serves the API on `:8000`.
-- `frontend` builds a standalone Next.js server and serves on `:3000`, proxying `/api/*` to the `backend` service.
+## Global Search
 
-> **Note:** the Docker configuration was authored and reviewed but could not be build-tested in this environment (no running Docker daemon available at the time). If you hit an image-build issue, please open an issue -- the non-Docker setup above is fully verified.
+Search live data across **Hosted Zones, DNS Records, and Route 53 sections**.
 
-## BIND import
-
-From a hosted zone's detail page, click **Import**:
-
-1. Upload a `.txt`/`.zone`/`.bind`/`.db` file (max 1 MB) containing standard BIND syntax (`$ORIGIN`, `$TTL`, `;` comments, and single-line records of the 9 supported types).
-2. The backend parses every line and returns a **preview**: which lines parsed into a valid record, and which failed (with a reason) -- nothing is written yet.
-3. Click **Import N record(s)** to commit. You get a **summary**: created / skipped (duplicates) / failed, with per-failure detail.
-
-The parser lives in `backend/app/utils/parsers.py`; it purposefully does not support multi-line records with parentheses continuation.
-
-## Export
-
-From a hosted zone's detail page, use the **Export** menu:
-
-- **JSON** -- the zone plus every record, in a structured format.
-- **BIND zone file** -- a valid `$ORIGIN`/`$TTL` zone file including the mocked NS records, generated from the live database (not hardcoded).
-
-Both are generated server-side (`backend/app/services/export_service.py`) from the same records you see in the table, and download via the browser's native file download.
-
-## Global search
-
-The header's search bar (`Search for services, features, hosted zones...`) is fully backend-driven -- no data is hardcoded on the frontend:
-
-1. Typing debounces 250ms, then calls `GET /api/search?q=`.
-2. `SearchService` (`backend/app/services/search_service.py`) matches, in one pass: hosted zones by domain name/description, DNS records by name/value/**type** across every zone (via a join in `DnsRecordRepository.search_global`), and Route 53 section names from a small static catalog kept server-side.
-3. Results render in an AWS-style dropdown grouped by category (**Hosted zones / DNS records / Route 53**), each with an icon, title, subtitle, and a badge (zone type or record type).
-4. Selecting a result navigates there -- a DNS record match deep-links to its zone's detail page with the records table's `?search=` param pre-filled, reusing the existing records list filter rather than building a separate view.
-
-Supports arrow-key navigation, `Enter` to select, `Esc`/click-outside to close, and shows a dedicated "No results found" state.
+- Debounced backend search
+- Categorized results
+- Deep linking
+- Keyboard navigation
+- No-results handling
 
 ## Keyboard shortcuts
 
@@ -400,20 +381,21 @@ Supports arrow-key navigation, `Enter` to select, `Esc`/click-outside to close, 
 
 Shortcuts are ignored while typing in an input/textarea/select (except `Esc`). See them any time via the header's **Help -> Keyboard shortcuts** menu.
 
-## Design decisions
+## Key Design Decisions
 
-- **Session cookie + Next.js rewrite instead of CORS+JWT.** Proxying `/api/*` through Next.js means the browser only ever sees one origin, so the backend's `httpOnly` cookie behaves like a normal first-party cookie. Simpler and safer than juggling CORS + `SameSite=None` + token storage in `localStorage`.
-- **PBKDF2 + opaque signed tokens instead of `bcrypt`/JWT libraries.** Avoids native-extension build issues across platforms while keeping the same "hashed password, signed expiring session" shape a real implementation would have. Clearly documented as mocked auth, per the assignment's scope.
-- **Repository pattern even for a single-database app.** Keeps SQL/filtering logic out of services and controllers, and made it trivial to unit-test business rules (services) independent of query shape.
-- **URL-synced list state (`useUrlParams`).** Search/filter/sort/page live in the query string, so hosted zone and record lists are shareable, bookmarkable, and survive a refresh or browser back/forward -- verified in this session.
-- **In-memory staging for BIND import preview.** A two-step preview/confirm flow needs somewhere to hold parsed-but-uncommitted records between requests; for a single-process SQLite app, a short-lived in-memory map keyed by an opaque token is simpler than a database table and is documented as such in `bind_service.py`.
-- **Tailwind v4 CSS variables layered under `@layer base`.** Cascade layers mean *unlayered* CSS always beats *layered* utility classes regardless of specificity -- base element resets (`a`, `body`, focus rings) are explicitly placed in `@layer base` so component utility classes (`text-white`, etc.) still win as expected.
-- **Global search matches server-side, not with a frontend fuzzy-search library.** Search results must reflect live database state (a record created a second ago should be findable immediately) and need to search across all zones' records, not just what's already been fetched to the client -- so `SearchService` does the matching in SQL, same as every other list endpoint.
-- **Mobile sidebar is a separate `mobileOpen` state from desktop `collapsed`, driven by one Tailwind breakpoint.** The two states are decoupled (an icon-rail collapse means something different from an off-canvas drawer) but toggled by the same header button -- each screen size only reacts to the state that's meaningful for it, via `md:` variants, rather than branching in JavaScript on window width.
+- **Layered backend architecture** — Routes → Controllers → Services → Repositories keeps HTTP, business logic, and database concerns separated.
+- **Next.js API rewrite** — `/api/*` requests are proxied server-side so authentication remains same-origin with `httpOnly` cookies.
+- **Repository pattern** — Database queries, filtering, sorting, and pagination are isolated from business logic.
+- **URL-synchronized state** — Search, filters, sorting, and pagination persist in the URL for shareable and refresh-safe views.
+- **Server-side global search** — Searches live database data across hosted zones, DNS records, and Route 53 sections.
+- **Two-step BIND import** — Parsed records are previewed and validated before being committed.
+- **Responsive UI architecture** — Desktop and mobile navigation states are handled independently for a consistent experience.
 
-## Known limitations / future improvements
+## Known Limitations
 
-- **Stateless session logout**: sessions are signed+expiring but not revocable server-side before expiry (no session table). Acceptable for a mock/demo login; a production version would add a session/blacklist table.
-- **Docker Compose is authored but not build-verified** in this environment (no Docker daemon running here) -- the local (non-Docker) setup is the fully verified path.
-- **Weighted/latency/failover routing policies** exist in the data model and are accepted by the API, but there is no dedicated UI for configuring them (out of scope per the assignment's DNS record form spec, which does not call for a routing-policy editor).
-- **Single mock account/user** -- no multi-tenant account switching, matching the assignment's "mock AWS account context" scope.
+- Authentication is mocked; no real IAM, OAuth, or MFA.
+- Single demo account with a fixed AWS account context.
+- SQLite is used for the assignment/demo environment.
+- DNS operations are simulated and do not affect real DNS infrastructure.
+- Advanced routing policies have limited UI coverage.
+- Sessions are not server-side revocable before expiry.
