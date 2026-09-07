@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 
-from app.api.routes import auth, dashboard, exports, hosted_zones, imports, records
+from app.api.routes import auth, dashboard, exports, hosted_zones, imports, records, search
 from app.core.config import get_settings
 from app.core.database import Base, engine
 from app.core.exceptions import (
@@ -81,6 +81,7 @@ app.include_router(hosted_zones.router)
 app.include_router(records.router)
 app.include_router(imports.router)
 app.include_router(exports.router)
+app.include_router(search.router)
 
 
 @app.get("/api/health")

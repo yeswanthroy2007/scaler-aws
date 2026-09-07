@@ -4,6 +4,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.dns_record import DnsRecord, DnsRecordType
+from app.models.hosted_zone import HostedZone
 
 _SORT_COLUMNS = {
     "name": DnsRecord.name,
@@ -64,6 +65,28 @@ class DnsRecordRepository:
 
         items = list(self.db.execute(stmt).scalars().all())
         return items, total
+
+    def search_global(self, query: str, limit: int = 6) -> list[tuple[DnsRecord, HostedZone]]:
+        """Search DNS records across every hosted zone by name, value, or type.
+
+        Returns (record, hosted_zone) pairs so callers can build a result
+        without a second round-trip to look up the parent zone.
+        """
+        like = f"%{query.strip().lower()}%"
+        stmt = (
+            select(DnsRecord, HostedZone)
+            .join(HostedZone, DnsRecord.hosted_zone_id == HostedZone.id)
+            .where(
+                or_(
+                    func.lower(DnsRecord.name).like(like),
+                    func.lower(DnsRecord.value).like(like),
+                    func.lower(DnsRecord.type).like(like),
+                )
+            )
+            .order_by(DnsRecord.name.asc())
+            .limit(limit)
+        )
+        return [(row[0], row[1]) for row in self.db.execute(stmt).all()]
 
     def list_all_for_zone(self, hosted_zone_id: int) -> list[DnsRecord]:
         stmt = (

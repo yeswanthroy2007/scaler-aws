@@ -2,11 +2,13 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Menu, Search, Bell, HelpCircle, ChevronDown, Moon, Sun, LogOut, Keyboard, User as UserIcon } from "lucide-react";
+import { Menu, Search, Bell, HelpCircle, ChevronDown, Moon, Sun, LogOut, Keyboard, User as UserIcon, X } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useTheme } from "@/features/theme/ThemeProvider";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { KeyboardShortcutsHelp } from "@/features/shortcuts/KeyboardShortcutsHelp";
+import { useGlobalSearch } from "@/features/search/useGlobalSearch";
+import { GlobalSearchResults } from "@/features/search/GlobalSearchResults";
 
 export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const { user, logout } = useAuth();
@@ -16,9 +18,14 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useOnClickOutside(accountRef, () => setAccountOpen(false));
   useOnClickOutside(helpRef, () => setHelpOpen(false));
+
+  const search = useGlobalSearch();
+  useOnClickOutside(searchRef, search.close);
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 bg-[var(--color-header-bg)] px-2 text-white">
@@ -36,14 +43,52 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
         <span className="hidden text-sm font-semibold sm:inline">Route 53 Console</span>
       </Link>
 
-      <div className="mx-2 hidden min-w-0 flex-1 items-center rounded border border-[var(--color-header-hover)] bg-[#1b2532] px-2 py-1 focus-within:ring-2 focus-within:ring-white/40 md:flex">
-        <Search size={14} className="mr-2 shrink-0 text-slate-400" aria-hidden="true" />
-        <input
-          type="search"
-          aria-label="Search"
-          placeholder="Search for services, features, hosted zones..."
-          className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none"
-        />
+      <div ref={searchRef} className="relative mx-2 hidden min-w-0 flex-1 md:block">
+        <div className="flex items-center rounded border border-[var(--color-header-hover)] bg-[#1b2532] px-2 py-1 focus-within:ring-2 focus-within:ring-white/40">
+          <Search size={14} className="mr-2 shrink-0 text-slate-400" aria-hidden="true" />
+          <input
+            ref={searchInputRef}
+            type="search"
+            role="combobox"
+            aria-label="Search"
+            aria-expanded={search.open}
+            aria-controls="global-search-results"
+            aria-autocomplete="list"
+            autoComplete="off"
+            placeholder="Search for services, features, hosted zones..."
+            value={search.query}
+            onChange={(e) => search.setQuery(e.target.value)}
+            onFocus={search.openDropdown}
+            onKeyDown={search.handleKeyDown}
+            className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 focus:outline-none"
+          />
+          {search.query && (
+            <button
+              type="button"
+              onClick={() => {
+                search.setQuery("");
+                searchInputRef.current?.focus();
+              }}
+              aria-label="Clear search"
+              className="ml-1 shrink-0 rounded p-0.5 text-slate-400 hover:text-white"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        {search.open && (
+          <div id="global-search-results">
+            <GlobalSearchResults
+              query={search.query}
+              results={search.results}
+              loading={search.loading}
+              error={search.error}
+              activeIndex={search.activeIndex}
+              onSelect={search.navigateTo}
+              onHover={search.setActiveIndex}
+            />
+          </div>
+        )}
       </div>
 
       <div className="ml-auto flex items-center gap-0.5">
