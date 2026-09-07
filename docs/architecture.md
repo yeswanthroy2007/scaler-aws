@@ -91,7 +91,7 @@ sequenceDiagram
     Note over B,F: On every page load, AuthProvider calls GET /api/auth/me.\nproxy.ts also blocks /route53/* at the edge if no session cookie is present,\navoiding a flash of protected content before the client check resolves.
 ```
 
-Session tokens are **not** JWTs: they are `base64(payload).base64(HMAC-SHA256(payload))`, verified in `core/security.py` without any third-party crypto dependency. This keeps the mock-auth dependency footprint at zero native packages, which mattered in this environment (see the Python 3.14 wheel-availability note in the setup history) while preserving the same "signed + expiring" security shape a JWT would have.
+Session tokens are **not** JWTs: they are `base64(payload).base64(HMAC-SHA256(payload))`, verified in `core/security.py` without any third-party crypto dependency (no `python-jose`, no `passlib`/`bcrypt`). This keeps the mock-auth dependency footprint at zero native packages -- which matters in practice on Python versions too new for a library's prebuilt wheels, where installing a native extension means compiling from source -- while preserving the same "signed + expiring" security shape a JWT would have.
 
 ## Hosted zone CRUD flow
 
@@ -220,3 +220,42 @@ sequenceDiagram
     end
     R-->>U: file download (Content-Disposition: attachment)
 ```
+
+## Global search flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant H as Header (useGlobalSearch)
+    participant R as GET /api/search?q=
+    participant Sv as SearchService
+    participant ZR as HostedZoneRepository
+    participant DR as DnsRecordRepository
+
+    U->>H: types into the search box
+    H->>H: debounce 250ms, guard against stale responses via a request id
+    H->>R: GET /api/search?q=<debounced query>
+    R->>Sv: search(query)
+    par
+        Sv->>ZR: list_paginated(search=query, page_size=5)
+        ZR-->>Sv: matching hosted zones
+    and
+        Sv->>DR: search_global(query, limit=5)
+        Note right of DR: JOINs dns_records -> hosted_zones,\nmatches name/value/type, across every zone
+        DR-->>Sv: (record, zone) pairs
+    and
+        Sv->>Sv: match query against the static Route 53 section catalog
+    end
+    Sv-->>R: SearchResponse { items: [...] } (hosted_zone | dns_record | section)
+    R-->>H: 200 JSON
+    H-->>U: grouped dropdown (Hosted zones / DNS records / Route 53)
+    U->>H: selects a result
+    alt hosted_zone or section
+        H->>U: router.push(item.href)
+    else dns_record
+        H->>U: router.push("/route53/hosted-zones/{zoneId}?search={recordToken}")
+        Note right of U: Reuses the existing records-table search param --\nno separate "record detail" view needed.
+    end
+```
+
+The same `?search=` query param that powers the hosted zone's own record search box (`useDnsRecordsList`, URL-synced via `useUrlParams`) is what a DNS record search result deep-links into, so clicking a record result lands on its zone's page with the table already filtered to that record -- no bespoke navigation target was built just for search.

@@ -26,9 +26,10 @@ A production-quality, full-stack clone of the AWS Route 53 web console -- built 
 14. [Docker](#docker)
 15. [BIND import](#bind-import)
 16. [Export](#export)
-17. [Keyboard shortcuts](#keyboard-shortcuts)
-18. [Design decisions](#design-decisions)
-19. [Known limitations / future improvements](#known-limitations--future-improvements)
+17. [Global search](#global-search)
+18. [Keyboard shortcuts](#keyboard-shortcuts)
+19. [Design decisions](#design-decisions)
+20. [Known limitations / future improvements](#known-limitations--future-improvements)
 
 ---
 
@@ -36,15 +37,17 @@ A production-quality, full-stack clone of the AWS Route 53 web console -- built 
 
 The app recreates the core Route 53 console experience:
 
-- AWS-style global header (search, region selector, notifications, help, account menu) and collapsible service sidebar
-- A Route 53 **Overview** dashboard with live stats and recent activity
+- AWS-style global header with a **live, backend-driven search bar** (region selector, notifications, help, account menu) and a collapsible service sidebar that becomes an off-canvas drawer on mobile
+- A Route 53 **Overview** dashboard with live stats and a real recent-activity feed
 - Full **Hosted Zones** CRUD with search, filtering, sorting, and pagination -- backed by real API queries, not client-side faking
 - Full **DNS Records** CRUD for all 9 common record types (A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, CAA), with a record-type-aware dynamic form
+- **Global search** across hosted zones, DNS records, and Route 53 sections, with an AWS-style results dropdown and click-to-navigate
 - **BIND zone file import** (upload -> parse -> preview -> confirm, with a per-record error report)
 - **Export** to JSON or a BIND zone file
 - **Dark mode**, **keyboard shortcuts**, and **bulk record selection/delete**
 - Polished "Coming soon" pages for Traffic Policies, Health Checks, Resolver, and Profiles
 - Mocked authentication with persistent sessions and protected routes
+- Responsive down to mobile: tables scroll horizontally in place, and the sidebar collapses to icons on desktop or a full off-canvas drawer below `md`
 
 ## Features
 
@@ -59,6 +62,7 @@ The app recreates the core Route 53 console experience:
 | DNS records: list / create / view / edit / delete | Done |
 | DNS records: search, filter by type, sort, pagination | Done |
 | Dynamic per-record-type form + client + server validation | Done |
+| Global search (hosted zones, DNS records, sections) | Done |
 | Confirmation dialogs for destructive actions | Done |
 | Toast notifications, loading/empty/error states | Done |
 | BIND zone file import (preview + confirm + summary) | Done |
@@ -68,7 +72,8 @@ The app recreates the core Route 53 console experience:
 | Bulk record selection + bulk delete | Done |
 | Coming Soon pages (Traffic Policies, Health Checks, Resolver, Profiles) | Done |
 | Audit log of create/update/delete/import actions | Done |
-| Automated tests (backend + frontend) | Done (43 backend, 33 frontend) |
+| Responsive layout (desktop icon-rail sidebar, mobile off-canvas drawer) | Done |
+| Automated tests (backend + frontend) | Done (52 backend, 33 frontend) |
 | Docker Compose | Provided (see [limitations](#known-limitations--future-improvements)) |
 
 ## Tech stack
@@ -137,14 +142,14 @@ See [`docs/architecture.md`](docs/architecture.md) for request-lifecycle diagram
 │       ├── repositories/       # Query layer (filtering, sorting, pagination)
 │       ├── services/            # Business logic, BIND parsing/export, audit logging
 │       ├── controllers/        # HTTP orchestration called by routes
-│       ├── api/routes/          # FastAPI routers (thin)
+│       ├── api/routes/          # FastAPI routers (thin), incl. search.py
 │       ├── utils/                # BIND parser, name-server generator
 │       └── seed.py               # Seed script (demo user + 5 zones + records + activity)
-│   └── tests/                    # pytest suite (43 tests)
+│   └── tests/                    # pytest suite (52 tests)
 ├── frontend/
 │   └── src/
 │       ├── app/                 # Next.js App Router pages/layouts
-│       ├── features/            # Domain hooks + feature-specific components (auth, hosted-zones, dns-records, theme, shortcuts)
+│       ├── features/            # Domain hooks + feature-specific components (auth, hosted-zones, dns-records, search, theme, shortcuts)
 │       ├── components/          # Reusable UI (ui/, layout/, tables/, modals/, feedback/, route53/)
 │       ├── services/api/        # Typed API client
 │       ├── types/                # Shared TS types
@@ -232,6 +237,7 @@ All routes are prefixed `/api`. Except `/api/auth/login` and `/api/health`, ever
 | POST | `/api/auth/logout` | Clear session cookie |
 | GET | `/api/auth/me` | Current user |
 | GET | `/api/dashboard/summary` | Zone/record counts + recent activity |
+| GET | `/api/search?q=` | Global search across hosted zones, DNS records, and Route 53 sections |
 | GET | `/api/hosted-zones` | List zones -- `search, zone_type, sort_by, sort_dir, page, page_size` |
 | POST | `/api/hosted-zones` | Create a hosted zone |
 | GET | `/api/hosted-zones/{id}` | Get one zone |
@@ -263,8 +269,8 @@ Authentication is intentionally mocked per the assignment scope: passwords are h
 Prerequisites: **Node.js 20+**, **Python 3.11+** (3.12 recommended for the widest prebuilt-wheel support), `pip`.
 
 ```bash
-git clone <this-repo>
-cd scaler-AWS
+git clone https://github.com/yeswanthroy2007/scaler-aws-router53-clone.git
+cd scaler-aws-router53-clone
 ```
 
 ## Environment variables
@@ -302,6 +308,8 @@ The API is now at `http://localhost:8000` (docs at `/docs`).
 
 Re-run `python -m app.seed --reset` at any time to wipe and reseed the database.
 
+> **Windows note:** if `--reload` doesn't seem to pick up a code change (rare, but seen on Windows with `WatchFiles`), stop the process and re-run `uvicorn app.main:app --port 8000` without `--reload` -- a clean restart always picks up the latest code.
+
 ## Running the frontend
 
 ```bash
@@ -314,7 +322,7 @@ Open `http://localhost:3000` -- you'll be redirected to `/login`.
 
 ## Running tests
 
-**Backend** (43 tests -- auth, hosted zone CRUD, record CRUD + validation, search/filter/pagination, import, export, dashboard):
+**Backend** (52 tests -- auth, hosted zone CRUD, record CRUD + validation, search/filter/pagination, import, export, dashboard, global search):
 
 ```bash
 cd backend
@@ -369,6 +377,17 @@ From a hosted zone's detail page, use the **Export** menu:
 
 Both are generated server-side (`backend/app/services/export_service.py`) from the same records you see in the table, and download via the browser's native file download.
 
+## Global search
+
+The header's search bar (`Search for services, features, hosted zones...`) is fully backend-driven -- no data is hardcoded on the frontend:
+
+1. Typing debounces 250ms, then calls `GET /api/search?q=`.
+2. `SearchService` (`backend/app/services/search_service.py`) matches, in one pass: hosted zones by domain name/description, DNS records by name/value/**type** across every zone (via a join in `DnsRecordRepository.search_global`), and Route 53 section names from a small static catalog kept server-side.
+3. Results render in an AWS-style dropdown grouped by category (**Hosted zones / DNS records / Route 53**), each with an icon, title, subtitle, and a badge (zone type or record type).
+4. Selecting a result navigates there -- a DNS record match deep-links to its zone's detail page with the records table's `?search=` param pre-filled, reusing the existing records list filter rather than building a separate view.
+
+Supports arrow-key navigation, `Enter` to select, `Esc`/click-outside to close, and shows a dedicated "No results found" state.
+
 ## Keyboard shortcuts
 
 | Shortcut | Action |
@@ -389,6 +408,8 @@ Shortcuts are ignored while typing in an input/textarea/select (except `Esc`). S
 - **URL-synced list state (`useUrlParams`).** Search/filter/sort/page live in the query string, so hosted zone and record lists are shareable, bookmarkable, and survive a refresh or browser back/forward -- verified in this session.
 - **In-memory staging for BIND import preview.** A two-step preview/confirm flow needs somewhere to hold parsed-but-uncommitted records between requests; for a single-process SQLite app, a short-lived in-memory map keyed by an opaque token is simpler than a database table and is documented as such in `bind_service.py`.
 - **Tailwind v4 CSS variables layered under `@layer base`.** Cascade layers mean *unlayered* CSS always beats *layered* utility classes regardless of specificity -- base element resets (`a`, `body`, focus rings) are explicitly placed in `@layer base` so component utility classes (`text-white`, etc.) still win as expected.
+- **Global search matches server-side, not with a frontend fuzzy-search library.** Search results must reflect live database state (a record created a second ago should be findable immediately) and need to search across all zones' records, not just what's already been fetched to the client -- so `SearchService` does the matching in SQL, same as every other list endpoint.
+- **Mobile sidebar is a separate `mobileOpen` state from desktop `collapsed`, driven by one Tailwind breakpoint.** The two states are decoupled (an icon-rail collapse means something different from an off-canvas drawer) but toggled by the same header button -- each screen size only reacts to the state that's meaningful for it, via `md:` variants, rather than branching in JavaScript on window width.
 
 ## Known limitations / future improvements
 
